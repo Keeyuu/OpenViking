@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "openviking": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "D:\\OpenViking_fork",
+        "run",
+        "openviking-mcp",
+        "--transport",
+        "stdio"
+      ]
+    }
+  }
+}

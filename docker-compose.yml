@@ -20,3 +20,22 @@ services:
     # If you need to override the default command (which runs openviking-server),
     # you can do so here. For example, to run the CLI:
     # command: ["openviking", "--help"]
+
+  openviking-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    image: ghcr.io/volcengine/openviking-mcp:main
+    container_name: openviking-mcp
+    ports:
+      - "2033:2033"
+    volumes:
+      - /var/lib/openviking/ov.conf:/app/ov.conf
+      - /var/lib/openviking/data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:2033/mcp || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

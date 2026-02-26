@@ -1,0 +1,57 @@
+# syntax=docker/dockerfile:1.9
+
+# MCP Server image — extends the base OpenViking build with mcp dependency.
+
+# Stage 1: Go toolchain
+FROM golang:1.26-trixie AS go-toolchain
+
+# Stage 2: build
+FROM ghcr.io/astral-sh/uv:python3.13-trixie-slim AS py-builder
+
+COPY --from=go-toolchain /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+ARG OPENVIKING_VERSION=0.0.0
+ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_OPENVIKING=${OPENVIKING_VERSION}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV UV_NO_DEV=1
+WORKDIR /app
+
+COPY pyproject.toml uv.lock setup.py README.md ./
+COPY openviking/ openviking/
+COPY openviking_cli/ openviking_cli/
+COPY openviking_mcp/ openviking_mcp/
+COPY src/ src/
+COPY third_party/ third_party/
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-editable --extra mcp
+
+# Stage 3: runtime
+FROM python:3.13-slim-trixie
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    libstdc++6 \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=py-builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+ENV OPENVIKING_CONFIG_FILE="/app/ov.conf"
+
+EXPOSE 2033
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:2033/mcp || exit 1
+
+CMD ["openviking-mcp"]
